@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Watch Tracker",
+  "version": "0.1.0",
+  "description": "Tracks what you watch across streaming platforms and stores it locally.",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Watch Tracker"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.netflix.com/*"],
+      "js": ["storage.js", "content-scripts/netflix.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.disneyplus.com/*"],
+      "js": ["storage.js", "content-scripts/disneyplus.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
