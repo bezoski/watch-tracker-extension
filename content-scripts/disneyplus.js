@@ -116,9 +116,7 @@ async function capture(reason) {
   const episode = findEpisodeInfo(all);
   const series = findSeries();
 
-  log(reason, { id, progress, episode, series, playing: !video.paused, anchor });
-
-  await saveEntry({
+  const saved = await saveEntry({
     id: `${PLATFORM}:${id}`,
     platform: PLATFORM,
     title: episode?.title ?? series,
@@ -127,6 +125,8 @@ async function capture(reason) {
     episode: episode?.episode ?? null,
     progress: progress ?? undefined,
   });
+
+  log(reason, saved);
 }
 
 /**
