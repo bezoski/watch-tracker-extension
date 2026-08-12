@@ -13,6 +13,8 @@ const PLATFORM = "disneyplus";
 const SAVE_INTERVAL_MS = 5000;
 const DEBUG = true;
 
+let captureTimer = null;
+
 function log(...args) {
   if (DEBUG) console.log("WT:", ...args);
 }
@@ -82,29 +84,55 @@ function findSeries() {
   return document.title.replace(/\s*\|\s*Disney\+\s*$/, "").trim() || null;
 }
 
+/** Season/episode never changes for a given content id, so the first reading wins. */
+let episodeCache = { id: null, info: null };
+
+/**
+ * Overlays that advertise the *next* episode carry the same "S2:O3" text as the current one.
+ * They live in their own shadow roots, so the host element identifies them.
+ */
+function isNextEpisodeUi(el) {
+  const host = el.getRootNode?.()?.host?.tagName?.toLowerCase() ?? "";
+  return host.includes("up-next") || String(el.className).includes("up-next");
+}
+
 /**
  * Season/episode is rendered as "S2:O3 Rozdział 11: Spadkobierczyni" — the letter is locale
  * dependent (O = odcinek in Polish, E in English), hence the loose character class.
  */
-function findEpisodeInfo(all) {
+function findEpisodeInfo(all, id) {
+  if (episodeCache.id === id) return episodeCache.info;
+
   for (const el of all) {
     if (el.children.length) continue;
+    if (isNextEpisodeUi(el)) continue;
     const text = el.textContent?.trim();
     if (!text) continue;
 
     const match = text.match(/S(\d+)\s*[:.]\s*[EO](\d+)\s*(.*)/i);
     if (match) {
-      return {
-        season: Number(match[1]),
-        episode: Number(match[2]),
-        title: match[3].replace(/^[\s:–-]+/, "").trim() || null,
+      episodeCache = {
+        id,
+        info: {
+          season: Number(match[1]),
+          episode: Number(match[2]),
+          title: match[3].replace(/^[\s:–-]+/, "").trim() || null,
+        },
       };
+      return episodeCache.info;
     }
   }
   return null;
 }
 
 async function capture(reason) {
+  // Reloading or updating the extension orphans this script; chrome.* calls then throw.
+  if (!chrome.runtime?.id) {
+    clearInterval(captureTimer);
+    log("extension context invalidated — stopping, reload the page");
+    return;
+  }
+
   const id = contentId();
   if (!id) return;
 
@@ -113,7 +141,7 @@ async function capture(reason) {
 
   const all = deepAll();
   const progress = findProgress(all, video);
-  const episode = findEpisodeInfo(all);
+  const episode = findEpisodeInfo(all, id);
   const series = findSeries();
 
   const saved = await saveEntry({
@@ -155,7 +183,7 @@ function watchForEnd() {
 function waitForPlayer() {
   if (findVideo() && watchForEnd()) {
     capture("initial capture");
-    setInterval(() => capture("tick"), SAVE_INTERVAL_MS);
+    captureTimer = setInterval(() => capture("tick"), SAVE_INTERVAL_MS);
     return;
   }
   setTimeout(waitForPlayer, 1000);
