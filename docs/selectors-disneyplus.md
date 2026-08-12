@@ -26,8 +26,12 @@ The real one has `readyState 4` and a `blob:` src, so select on:
 `video.duration` is `Infinity`, and `video.seekable.end()` returned 181s early in the episode
 but 33s near its end — Disney+ swaps the MediaSource mid-playback, so the element's timeline
 does not map to the episode. `currentTime / duration` is therefore unusable here (the project
-plan assumed otherwise). Progress has to be read from the player UI progress bar instead
-(`role="slider"`, `aria-valuenow` / `aria-valuemax`) — exact element still to be confirmed.
+plan assumed otherwise). Progress comes from the player UI progress bar instead
+(`role="slider"`, `aria-valuenow` / `aria-valuemax`), whose values are confirmed to be seconds.
+
+That slider only exists in the DOM while the controls overlay is visible, i.e. for a few seconds
+after a mouse move. Between readings the last value is used as an anchor and the elapsed delta
+from `video.currentTime` is added to it.
 
 ## Shadow DOM
 
@@ -36,9 +40,9 @@ as `document.querySelector(tag).shadowRoot`, but its *contents* need a recursive
 
 | Purpose | Element |
 | --- | --- |
-| Title / season / episode | `title-overlay` (empty in captures so far — likely rendered inside the controls overlay instead) |
+| Title / season / episode | not `title-overlay` (always empty); the text is somewhere in the controls overlay and is found by scanning leaf text nodes for `S<n>:<E\|O><n>` |
 | Episode finished | `up-next-lite-v1` |
-| Cover art | `poster-overlay` (empty so far) |
+| Cover art | `poster-overlay` — empty in every capture, so entries are saved without a poster |
 
 Other hosts present: `disney-web-player-ui`, `main-app-controls-overlay`, `skip-overlay`,
 `preplay-overlay`, `buffering-overlay`, `inactivity-overlay`.
@@ -53,9 +57,13 @@ Other hosts present: `disney-web-player-ui`, `main-app-controls-overlay`, `skip-
 <div class="up-next-lite-v1-overlay__episode-title">S2:O3 Rozdział 11: Spadkobierczyni</div>
 ```
 
-A `MutationObserver` on its shadow root is the "watched" signal. Careful: the titles inside
-describe the **next** episode, not the current one — use the element's appearance only, never
-its text.
+A `MutationObserver` on its shadow root is the "watched" signal — verified end to end: an entry
+saved as `in-progress` flips to `watched` the moment the overlay appears. Careful: the titles
+inside describe the **next** episode, not the current one — use the element's appearance only,
+never its text, and skip its subtree when scanning for the current episode number.
+
+Known trade-off: seeking to the end of an episode triggers the same overlay, so it counts as
+watched. Telling that apart from real playback is not possible from the DOM alone.
 
 ## Title source
 
