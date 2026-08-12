@@ -139,6 +139,9 @@ async function capture(reason) {
   const video = findVideo();
   if (!video) return;
 
+  // Nothing moves while paused, so re-saving the same numbers would only spam storage.
+  if (video.paused && reason === "tick") return;
+
   const all = deepAll();
   const progress = findProgress(all, video);
   const episode = findEpisodeInfo(all, id);
