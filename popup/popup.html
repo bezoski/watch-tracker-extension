@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Watch Tracker</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Watch Tracker</h1>
+      <input id="search" type="search" placeholder="Search by title…" autocomplete="off" />
+    </header>
+
+    <ul id="list"></ul>
+    <p id="empty" hidden>Nothing tracked yet.</p>
+
+    <!-- Not modules: storage.js defines the shared helpers in the same global scope. -->
+    <script src="../storage.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
