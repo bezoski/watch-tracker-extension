@@ -81,12 +81,15 @@ function findProgress(all, video) {
 }
 
 /** Series name comes from the tab title; the player never shows it outside the controls. */
-function findSeries() {
+function seriesName() {
   return document.title.replace(/\s*\|\s*Disney\+\s*$/, "").trim() || null;
 }
 
-/** Season/episode never changes for a given content id, so the first reading wins. */
-let episodeCache = { id: null, info: null };
+/** Metadata never changes for a given content id, so the first successful reading wins. */
+let mediaCache = { id: null, info: null };
+
+/** Captures spent waiting for an episode line before settling on "this is a movie". */
+let movieAttempts = 0;
 
 /**
  * The current episode is named in the `title-bug` overlay. Several other overlays render the
@@ -101,45 +104,43 @@ function hostOf(el) {
 }
 
 /**
- * Season/episode is rendered as "S2:O3 Rozdział 11: Spadkobierczyni" — the letter is locale
- * dependent (O = odcinek in Polish, E in English), hence the loose character class.
+ * Reads what is playing from the title bug, which shows "S2:O3 Rozdział 11: Spadkobierczyni"
+ * for episodes and a plain name for movies. The season/episode letter is locale dependent
+ * (O = odcinek in Polish, E in English), hence the loose character class.
+ *
+ * Returns null until the title bug is on screen — the caller then skips saving, so an entry is
+ * never written without knowing whether it belongs to a series.
  */
-function findEpisodeInfo(all, id) {
-  if (episodeCache.id === id) return episodeCache.info;
+function findMedia(all, id) {
+  if (mediaCache.id === id) return mediaCache.info;
 
-  const candidates = [];
+  // The title bug holds several lines — the show name and, for episodes, a separate line with
+  // the episode code. Which line renders first is not guaranteed, so all of them are searched.
+  const texts = all
+    .filter((el) => !el.children.length && hostOf(el) === TITLE_HOST)
+    .map((el) => el.textContent?.trim())
+    .filter(Boolean);
 
-  for (const el of all) {
-    if (el.children.length) continue;
-    const text = el.textContent?.trim();
-    if (!text) continue;
+  if (!texts.length) return null;
 
-    const match = text.match(/S(\d+)\s*[:.]\s*[EO](\d+)\s*(.*)/i);
-    if (!match) continue;
+  const match = texts.map((text) => text.match(/S(\d+)\s*[:.]\s*[EO](\d+)\s*(.*)/i)).find(Boolean);
 
-    // Which overlay a match sits in is the only way to tell the current episode from the
-    // several places where Disney+ advertises other ones.
-    candidates.push({
-      host: hostOf(el),
-      className: String(el.className),
-      text: text.slice(0, 60),
-      info: {
+  // A movie's title bug never grows an episode line, but an episode's may lag a tick behind, so
+  // the "no episode code" verdict is only trusted after a few attempts.
+  if (!match && ++movieAttempts < 4) return null;
+
+  const info = match
+    ? {
+        series: seriesName(),
         season: Number(match[1]),
         episode: Number(match[2]),
         title: match[3].replace(/^[\s:–-]+/, "").trim() || null,
-      },
-    });
-  }
+      }
+    : { series: null, season: null, episode: null, title: texts[0] };
 
-  if (candidates.length) log("episode candidates", candidates);
-
-  // No title bug on screen yet: leave the entry without episode data and try again next tick,
-  // rather than caching a number scraped from some other overlay.
-  const picked = candidates.find((candidate) => candidate.host === TITLE_HOST);
-  if (!picked) return null;
-
-  episodeCache = { id, info: picked.info };
-  return picked.info;
+  log("media identified", info);
+  mediaCache = { id, info };
+  return info;
 }
 
 async function capture(reason) {
@@ -158,6 +159,7 @@ async function capture(reason) {
   if (id !== currentId) {
     currentId = id;
     anchor = null;
+    movieAttempts = 0;
     log("now playing", id);
   }
 
@@ -168,18 +170,17 @@ async function capture(reason) {
   if (video.paused && reason === "tick") return;
 
   const all = deepAll();
-  const progress = findProgress(all, video);
-  const episode = findEpisodeInfo(all, id);
-  const series = findSeries();
+  const media = findMedia(all, id);
+
+  // Saving before the title bug appears would create an entry with no series to group it under,
+  // which shows up in the popup as a second, nameless card for the same show.
+  if (!media) return;
 
   const saved = await saveEntry({
     id: `${PLATFORM}:${id}`,
     platform: PLATFORM,
-    title: episode?.title ?? series,
-    series: episode ? series : null,
-    season: episode?.season ?? null,
-    episode: episode?.episode ?? null,
-    progress: progress ?? undefined,
+    ...media,
+    progress: findProgress(all, video) ?? undefined,
   });
 
   log(reason, saved);
