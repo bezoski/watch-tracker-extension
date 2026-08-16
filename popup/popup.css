@@ -1,6 +1,8 @@
 :root {
   --bg: #11151c;
   --surface: #1b2029;
+  --surface-alt: #222834;
+  --line: #2c333f;
   --text: #e8eaed;
   --muted: #9aa3b2;
   --accent: #4a9eff;
@@ -30,7 +32,7 @@ h1 {
 #search {
   width: 100%;
   padding: 7px 10px;
-  border: 1px solid #2c333f;
+  border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
   color: var(--text);
@@ -42,7 +44,7 @@ h1 {
   border-color: var(--accent);
 }
 
-#list {
+ul {
   margin: 12px 0 0;
   padding: 0;
   list-style: none;
@@ -51,11 +53,26 @@ h1 {
   gap: 8px;
 }
 
-.entry {
+.entry,
+.episode {
   position: relative;
   padding: 10px;
   border-radius: 8px;
   background: var(--surface);
+}
+
+.episode {
+  background: var(--surface-alt);
+}
+
+.entry--clickable {
+  cursor: pointer;
+}
+
+.entry--clickable:hover,
+.entry--clickable:focus-visible {
+  background: var(--surface-alt);
+  outline: none;
 }
 
 .entry__title {
@@ -65,40 +82,50 @@ h1 {
   font-weight: 600;
 }
 
-.entry__meta {
+.entry__meta,
+.episode__title {
   margin: 2px 0 8px;
   color: var(--muted);
   font-size: 11px;
 }
 
-.entry__bar {
+.episode__title {
+  padding-right: 20px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.bar {
   height: 4px;
   border-radius: 2px;
-  background: #2c333f;
+  background: var(--line);
   overflow: hidden;
 }
 
-.entry__fill {
+.bar__fill {
   height: 100%;
   background: var(--accent);
 }
 
-.entry--watched .entry__fill {
+.entry--watched .bar__fill,
+.episode--watched .bar__fill {
   background: var(--done);
 }
 
-.entry__status {
-  margin-top: 6px;
+.entry__status,
+.episode__status {
+  margin: 6px 0 0;
   color: var(--muted);
   font-size: 11px;
 }
 
-.entry--watched .entry__status {
+.entry--watched .entry__status,
+.episode--watched .episode__status {
   color: var(--done);
 }
 
 /* Only revealed on hover so the list stays calm when just browsing. */
-.entry__delete {
+.delete {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -112,13 +139,36 @@ h1 {
   opacity: 0;
 }
 
-.entry:hover .entry__delete,
-.entry__delete:focus {
+.entry:hover .delete,
+.episode:hover .delete,
+.delete:focus {
   opacity: 1;
 }
 
-.entry__delete:hover {
+.delete:hover {
   color: #ff6b6b;
+}
+
+#back {
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#back:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+#detail-meta {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 #empty {

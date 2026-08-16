@@ -6,13 +6,20 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <header>
+    <header id="browse-header">
       <h1>Watch Tracker</h1>
       <input id="search" type="search" placeholder="Search by title…" autocomplete="off" />
     </header>
 
     <ul id="list"></ul>
     <p id="empty" hidden>Nothing tracked yet.</p>
+
+    <section id="detail" hidden>
+      <button id="back" type="button">← Back</button>
+      <h1 id="detail-title"></h1>
+      <p id="detail-meta"></p>
+      <ul id="detail-list"></ul>
+    </section>
 
     <!-- Not modules: storage.js defines the shared helpers in the same global scope. -->
     <script src="../storage.js"></script>
