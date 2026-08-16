@@ -13,6 +13,11 @@
   box-sizing: border-box;
 }
 
+/* The display rules below would otherwise override the browser's styling of [hidden]. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   width: 380px;
   max-height: 520px;

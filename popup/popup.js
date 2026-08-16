@@ -175,9 +175,8 @@ async function renderDetail() {
   detailTitle.textContent = group.latest.series;
   detailMeta.textContent = `${platformLabel(group.latest)} · ${group.episodes.length} tracked`;
 
-  const episodes = [...group.episodes].sort(
-    (a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0)
-  );
+  // Most recently watched first — the point of opening a series is "where did I stop".
+  const episodes = [...group.episodes].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   detailList.replaceChildren(...episodes.map(createEpisodeNode));
 }
 
