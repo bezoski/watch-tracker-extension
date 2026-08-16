@@ -14,6 +14,7 @@ const SAVE_INTERVAL_MS = 5000;
 const DEBUG = true;
 
 let captureTimer = null;
+let currentId = null;
 
 function log(...args) {
   if (DEBUG) console.log("WT:", ...args);
@@ -88,12 +89,15 @@ function findSeries() {
 let episodeCache = { id: null, info: null };
 
 /**
- * Overlays that advertise the *next* episode carry the same "S2:O3" text as the current one.
- * They live in their own shadow roots, so the host element identifies them.
+ * The current episode is named in the `title-bug` overlay. Several other overlays render the
+ * same "S2:O3" shape for *other* episodes (`pivot-tray-tile` for the up-next tray,
+ * `up-next-lite-v1` at the end), so matching by element rather than excluding known offenders
+ * is the only reliable rule.
  */
-function isNextEpisodeUi(el) {
-  const host = el.getRootNode?.()?.host?.tagName?.toLowerCase() ?? "";
-  return host.includes("up-next") || String(el.className).includes("up-next");
+const TITLE_HOST = "title-bug";
+
+function hostOf(el) {
+  return el.getRootNode?.()?.host?.tagName?.toLowerCase() ?? "(document)";
 }
 
 /**
@@ -103,26 +107,39 @@ function isNextEpisodeUi(el) {
 function findEpisodeInfo(all, id) {
   if (episodeCache.id === id) return episodeCache.info;
 
+  const candidates = [];
+
   for (const el of all) {
     if (el.children.length) continue;
-    if (isNextEpisodeUi(el)) continue;
     const text = el.textContent?.trim();
     if (!text) continue;
 
     const match = text.match(/S(\d+)\s*[:.]\s*[EO](\d+)\s*(.*)/i);
-    if (match) {
-      episodeCache = {
-        id,
-        info: {
-          season: Number(match[1]),
-          episode: Number(match[2]),
-          title: match[3].replace(/^[\s:–-]+/, "").trim() || null,
-        },
-      };
-      return episodeCache.info;
-    }
+    if (!match) continue;
+
+    // Which overlay a match sits in is the only way to tell the current episode from the
+    // several places where Disney+ advertises other ones.
+    candidates.push({
+      host: hostOf(el),
+      className: String(el.className),
+      text: text.slice(0, 60),
+      info: {
+        season: Number(match[1]),
+        episode: Number(match[2]),
+        title: match[3].replace(/^[\s:–-]+/, "").trim() || null,
+      },
+    });
   }
-  return null;
+
+  if (candidates.length) log("episode candidates", candidates);
+
+  // No title bug on screen yet: leave the entry without episode data and try again next tick,
+  // rather than caching a number scraped from some other overlay.
+  const picked = candidates.find((candidate) => candidate.host === TITLE_HOST);
+  if (!picked) return null;
+
+  episodeCache = { id, info: picked.info };
+  return picked.info;
 }
 
 async function capture(reason) {
@@ -135,6 +152,14 @@ async function capture(reason) {
 
   const id = contentId();
   if (!id) return;
+
+  // Disney+ is an SPA: switching episodes changes the URL without reloading this script, so the
+  // previous episode's progress anchor has to be dropped or it would be applied to the new one.
+  if (id !== currentId) {
+    currentId = id;
+    anchor = null;
+    log("now playing", id);
+  }
 
   const video = findVideo();
   if (!video) return;
