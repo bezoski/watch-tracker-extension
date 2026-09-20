@@ -208,6 +208,21 @@ async function peekSeason() {
   return Number(season);
 }
 
+/** The panel can linger in the DOM once dismissed, so presence on its own does not mean open. */
+function selectorOpen() {
+  const panel = document.querySelector(SELECTOR_PANEL);
+  return Boolean(panel?.getClientRects().length);
+}
+
+/** Closing is animated, so the state is polled rather than sampled once. */
+async function waitUntilClosed(timeout) {
+  for (let waited = 0; waited < timeout; waited += 100) {
+    if (!selectorOpen()) return true;
+    await wait(100);
+  }
+  return !selectorOpen();
+}
+
 /**
  * Leaving the panel open over someone's episode is the one outcome worth several attempts. None of
  * them touches the player surface: a click there toggles pause, and a tracker must not stop
@@ -219,8 +234,7 @@ async function closeSelector(button) {
 
   for (const close of [() => button.click(), escape(document), escape(window)]) {
     close();
-    await wait(300);
-    if (!document.querySelector(SELECTOR_PANEL)) return;
+    if (await waitUntilClosed(700)) return;
   }
 
   log("episode selector would not close — dismiss it by hand, and tell me");
