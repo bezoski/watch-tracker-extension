@@ -85,6 +85,28 @@ The season-from-a-neighbouring-element patterns are kept for the shapes where on
 (`S6`, `S6:`, `Sezon 6`, `6. sezon`, or `S6:O3` inline), since no Netflix locale has been ruled
 out — but on this account nothing in the player carries it.
 
+## The episode selector does name the season
+
+`[data-uia="control-episodes"]` responds to a plain `.click()` — unlike mouse movement, synthetic
+clicks are acted on. Opening it mounts:
+
+| Purpose | Element |
+| --- | --- |
+| Panel root | `selector-episode` |
+| Season of the pane on screen | `selector-episode-header` → `"Sezon 6"` |
+| Marker on the episode being played | `episode-pane-item-now-playing` |
+| Season list / episode list | `season-pane`, `season-pane-item-<id>`, `episode-pane`, `episode-pane-item` |
+
+Confirmed on "Bogdan Boner: Egzorcysta" episode `Bimbrman` (`/watch/81942417`), which the title
+overlay renders as bare `O2` while the selector header reads `Sezon 6`.
+
+The header alone is not enough: the panel remembers whichever season was browsed last, so a
+reading is only trusted when `episode-pane-item-now-playing` is in the DOM at the same time —
+that marker is what ties the season on screen to the episode actually playing.
+
+Cost: the panel visibly flashes over the video. Hence once per content id, only when the season is
+unknown, and only after the entry has already been saved.
+
 ## Watched detection
 
 At the end of the episode the controls are replaced by two buttons, either of which means the

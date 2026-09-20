@@ -20,6 +20,12 @@ const PROBE_INTERVAL_MS = 1000;
 const TITLE_OVERLAY = '[data-uia="video-title"]';
 const PLAYER = '[data-uia="player"]';
 
+/** The episode selector — the only place in the player that names the season. */
+const EPISODES_BUTTON = '[data-uia="control-episodes"]';
+const SELECTOR_PANEL = '[data-uia="selector-episode"]';
+const SEASON_HEADER = '[data-uia="selector-episode-header"]';
+const NOW_PLAYING = '[data-uia="episode-pane-item-now-playing"]';
+
 /** Either button means the episode reached its credits. */
 const END_SIGNALS =
   '[data-uia="next-episode-seamless-button"], [data-uia="watch-credits-seamless-button"]';
@@ -39,6 +45,11 @@ let blindProbes = 0;
 
 /** Bumped per synthetic move, because a pointer that never changes position is not a move. */
 let revealCount = 0;
+
+/** Ids whose season has been looked up, so the selector panel flashes at most once per episode. */
+const seasonPeeked = new Set();
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function log(...args) {
   if (DEBUG) console.log("WT:", ...args);
@@ -62,7 +73,7 @@ function findVideo() {
  */
 const EPISODE_CODE = /^(?:S(\d+)\s*[:.]\s*)?[EO](\d+)$/i;
 
-/** A season standing on its own in a neighbouring element: "S6", "S6:", "Sezon 6", "6. sezon". */
+/** A season standing on its own: the selector's header ("Sezon 6"), or a neighbouring element. */
 const SEASON_ONLY = [
   /^S(?:ezon|eason)?\s*(\d+)\s*[:.]?$/i,
   /^(\d+)\s*\.?\s*(?:sezon|season)\s*[:.]?$/i,
@@ -159,6 +170,62 @@ function revealControls() {
   );
 }
 
+/**
+ * Reads the season from the episode selector, which is the only part of the player that names it.
+ *
+ * This is deliberate UI poking: the panel is opened, read and closed again, so the viewer sees it
+ * flash. That cost is why it happens once per episode and only when the season is still unknown —
+ * and why it runs after the entry has already been saved, so a failed peek never delays the popup.
+ */
+async function peekSeason() {
+  revealControls();
+  await wait(400);
+
+  const button = document.querySelector(EPISODES_BUTTON);
+  if (!button) {
+    log("episode selector button not on screen, season stays unknown");
+    return null;
+  }
+
+  button.click();
+  await wait(800);
+
+  const header = document.querySelector(SEASON_HEADER)?.textContent?.trim();
+
+  // The panel remembers whichever season was browsed last, so the header alone proves nothing.
+  // The "now playing" marker is what ties the season on screen to the episode being played.
+  const showsCurrentEpisode = Boolean(document.querySelector(NOW_PLAYING));
+  const season = SEASON_ONLY.map((pattern) => header?.match(pattern)?.[1]).find(Boolean);
+
+  await closeSelector(button);
+
+  if (!season || !showsCurrentEpisode) {
+    log("season not readable from the selector", { header, showsCurrentEpisode });
+    return null;
+  }
+
+  log("season read from the episode selector:", season);
+  return Number(season);
+}
+
+/**
+ * Leaving the panel open over someone's episode is the one outcome worth several attempts. None of
+ * them touches the player surface: a click there toggles pause, and a tracker must not stop
+ * playback to answer a question about a season.
+ */
+async function closeSelector(button) {
+  const escape = (target) => () =>
+    target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+
+  for (const close of [() => button.click(), escape(document), escape(window)]) {
+    close();
+    await wait(300);
+    if (!document.querySelector(SELECTOR_PANEL)) return;
+  }
+
+  log("episode selector would not close — dismiss it by hand, and tell me");
+}
+
 async function capture(reason) {
   // Reloading or updating the extension orphans this script; chrome.* calls then throw.
   if (!chrome.runtime?.id) {
@@ -207,6 +274,18 @@ async function capture(reason) {
   });
 
   log(reason, saved);
+
+  // Only episodes, only once, and only while the season is missing: on this account the player
+  // itself never states it, so the selector is the only source (docs/selectors-netflix.md).
+  if (media.series && media.season === null && !seasonPeeked.has(id)) {
+    seasonPeeked.add(id);
+
+    const season = await peekSeason();
+    if (!season) return;
+
+    mediaCache = { id, info: { ...media, season } };
+    log("season filled in", await saveEntry({ id: `${PLATFORM}:${id}`, season }));
+  }
 }
 
 /** One flag per id, because both end signals and the `ended` event can fire for the same episode. */
