@@ -24,10 +24,14 @@ const detail = document.getElementById("detail");
 const detailTitle = document.getElementById("detail-title");
 const detailMeta = document.getElementById("detail-meta");
 const detailList = document.getElementById("detail-list");
+const seasonFilters = document.getElementById("seasons");
 const backButton = document.getElementById("back");
 
 /** Key of the series currently opened, or null while browsing. */
 let openSeriesKey = null;
+
+/** Season shown in the detail view; null means all of them. */
+let selectedSeason = null;
 
 const platformLabel = (entry) => PLATFORM_LABELS[entry.platform] ?? entry.platform;
 const percent = (entry) => Math.round((entry.progress ?? 0) * 100);
@@ -93,7 +97,7 @@ function createGroupNode(group) {
   const status = document.createElement("p");
   status.className = "entry__status";
   status.textContent = isSeries
-    ? `${statusLine(latest)} · ${episodes.length} episode${episodes.length > 1 ? "s" : ""} tracked`
+    ? `${statusLine(latest)} · ${episodes.length} episode${episodes.length > 1 ? "s" : ""} watched`
     : statusLine(latest);
 
   item.append(title, meta, createProgressBar(latest), status);
@@ -144,8 +148,39 @@ function createEpisodeNode(entry) {
   return item;
 }
 
+/**
+ * Season chips are derived from the episodes actually stored, so a season shows up by itself
+ * once anything from it has been watched — there is nothing to configure.
+ */
+function renderSeasonFilters(episodes) {
+  const seasons = [...new Set(episodes.map((entry) => entry.season).filter(Boolean))].sort(
+    (a, b) => a - b
+  );
+
+  seasonFilters.hidden = seasons.length === 0;
+  if (seasons.length === 0) return;
+
+  const chip = (label, season) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = season === selectedSeason ? "chip chip--active" : "chip";
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      selectedSeason = season;
+      renderDetail();
+    });
+    return button;
+  };
+
+  seasonFilters.replaceChildren(
+    chip("All", null),
+    ...seasons.map((season) => chip(`Season ${season}`, season))
+  );
+}
+
 async function openSeries(group) {
   openSeriesKey = group.key;
+  selectedSeason = null;
   await renderDetail();
 }
 
@@ -173,10 +208,19 @@ async function renderDetail() {
   detail.hidden = false;
 
   detailTitle.textContent = group.latest.series;
-  detailMeta.textContent = `${platformLabel(group.latest)} · ${group.episodes.length} tracked`;
+  detailMeta.textContent = `${platformLabel(group.latest)} · ${group.episodes.length} watched`;
+
+  renderSeasonFilters(group.episodes);
+
+  // The selected season may disappear when its last episode is deleted.
+  const seasonExists = group.episodes.some((entry) => entry.season === selectedSeason);
+  if (selectedSeason !== null && !seasonExists) selectedSeason = null;
 
   // Most recently watched first — the point of opening a series is "where did I stop".
-  const episodes = [...group.episodes].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const episodes = group.episodes
+    .filter((entry) => selectedSeason === null || entry.season === selectedSeason)
+    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+
   detailList.replaceChildren(...episodes.map(createEpisodeNode));
 }
 

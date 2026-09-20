@@ -1,5 +1,7 @@
 # Projekt: Wtyczka do przeglądarki — tracker obejrzanych (Netflix, Disney+, Max, Prime Video)
 
+**Język projektu: angielski.** Nazewnictwo w kodzie (nazwy zmiennych, funkcji, plików), komentarze i cały UI popupu — po angielsku (np. "Movie" nie "Film", "Watched" nie "Obejrzane", "Season/Episode" nie "Sezon/Odcinek"). Standard w branży, tak samo jak reszta projektów w portfolio — repo ma być czytelne dla każdego rekrutera, nie tylko polskiego.
+
 ## Problem
 
 Historia oglądania jest rozproszona po platformach streamingowych i nietrwała (np. Netflix kasuje/przycina historię, gdy nie masz aktywnej subskrypcji). Brak jednego miejsca, gdzie widać na czym skończyłeś, niezależnie od platformy.

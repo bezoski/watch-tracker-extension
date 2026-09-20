@@ -176,6 +176,33 @@ ul {
   font-size: 11px;
 }
 
+#seasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chip {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.chip--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 #empty {
   margin-top: 24px;
   color: var(--muted);
