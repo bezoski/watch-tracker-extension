@@ -18,6 +18,7 @@ const DEBUG = true;
 const PROBE_INTERVAL_MS = 1000;
 
 const TITLE_OVERLAY = '[data-uia="video-title"]';
+const PLAYER = '[data-uia="player"]';
 
 /** Either button means the episode reached its credits. */
 const END_SIGNALS =
@@ -32,6 +33,12 @@ let markedId = null;
 
 /** Metadata never changes for a given content id, so the first successful reading wins. */
 let mediaCache = { id: null, info: null };
+
+/** Probes that found no title to read, counted so the console can say why nothing is saved. */
+let blindProbes = 0;
+
+/** Bumped per synthetic move, because a pointer that never changes position is not a move. */
+let revealCount = 0;
 
 function log(...args) {
   if (DEBUG) console.log("WT:", ...args);
@@ -65,14 +72,30 @@ const EPISODE_CODE = /^(?:S(\d+)\s*[:.]\s*)?[EO](\d+)$/i;
  */
 function findMedia() {
   const overlay = document.querySelector(TITLE_OVERLAY);
-  if (!overlay) return null;
 
-  const texts = [...overlay.querySelectorAll("*")]
+  // Logged sparsely rather than every probe: a title that never resolves would flood the console,
+  // but staying silent here makes "not mounted" indistinguishable from the script not running.
+  if (!overlay) {
+    if (blindProbes++ % 10 === 0) log("no title overlay in the DOM, probe", blindProbes);
+    return null;
+  }
+
+  // An episode's overlay nests its lines in elements, so the leaves are what hold the text. A
+  // movie's is a single div wrapping a bare text node — no leaf element to walk, hence the
+  // fallback to the overlay's own text.
+  const leaves = [...overlay.querySelectorAll("*")]
     .filter((el) => !el.children.length)
     .map((el) => el.textContent?.trim())
     .filter(Boolean);
 
-  if (!texts.length) return null;
+  const texts = leaves.length ? leaves : [overlay.textContent?.trim()].filter(Boolean);
+
+  if (!texts.length) {
+    if (blindProbes++ % 10 === 0) log("title overlay has no text:", overlay.outerHTML.slice(0, 300));
+    return null;
+  }
+
+  log("title overlay reads", texts);
 
   const codeIndex = texts.findIndex((text) => EPISODE_CODE.test(text));
   if (codeIndex === -1) return { series: null, season: null, episode: null, title: texts[0] };
@@ -99,13 +122,27 @@ function findProgress(video) {
 
 /**
  * Nothing states the title outside the controls overlay, so a viewer who never touches the mouse
- * would never get an entry at all. A synthetic move is enough to make Netflix mount the overlay;
- * it is sent only while the title is still unknown, so the controls do not keep flashing for the
- * rest of the episode.
+ * would never get an entry at all. One synthetic move makes Netflix mount it, and it is sent only
+ * while the title is still unknown, so the controls do not keep flashing for the rest of playback.
+ *
+ * The event is specific, not interchangeable: `pointermove` on the player is the only combination
+ * Netflix acts on — `mousemove`, `mouseover` and `keydown` were all ignored, as was every other
+ * target tried (window, document, the html element, watch-video, video-canvas, the video itself).
+ * A plain MouseEvent is what was verified to work, so PointerEvent is deliberately not used.
  */
 function revealControls() {
-  const target = document.querySelector('[data-uia="watch-video"]') ?? document.body;
-  target.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 1, clientY: 1 }));
+  const player = document.querySelector(PLAYER);
+  if (!player) return;
+
+  player.dispatchEvent(
+    new MouseEvent("pointermove", {
+      bubbles: true,
+      clientX: 100 + ((revealCount++ * 37) % 300),
+      clientY: 300,
+      movementX: 7,
+      movementY: 5,
+    })
+  );
 }
 
 async function capture(reason) {

@@ -37,6 +37,35 @@ video-title → "Bogdan Boner: EgzorcystaO1Zakopane"
 That is three children read as one string: show name, episode code, episode title. They have to be
 read as separate elements, not as `textContent`.
 
+Movies use the same element with a single line — confirmed on `/watch/60004480`:
+
+```html
+<div class="medium …" data-uia="video-title">Władca Pierścieni: Drużyna Pierścienia</div>
+```
+
+Note the structural difference, which a shared parser has to handle: an episode nests its three
+lines in child elements, while a movie wraps a bare text node with no child element at all — so
+walking to the leaf elements finds nothing and the overlay's own text is the only reading.
+
+## Waking the controls without a mouse
+
+The overlay can be mounted on demand, but only with one specific event on one specific target:
+
+```js
+document
+  .querySelector('[data-uia="player"]')
+  .dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 150, clientY: 300 }));
+```
+
+Everything else tried was ignored: `mousemove`, `mouseover` and `keydown` on that same target, and
+all four event types on `window`, `document`, `document.documentElement`, `watch-video`,
+`video-canvas` and the `video` element. Coordinates have to change between dispatches, or a second
+event reads as no movement.
+
+This is why the script does not need `"world": "MAIN"`, which `plan.md` anticipated: metadata is
+reachable from the isolated world, and a MAIN-world script would lose `chrome.storage` and need a
+`postMessage` bridge to save anything.
+
 ## Movie vs episode
 
 The episode code among those children is the signal, so the verdict is immediate — no waiting game
