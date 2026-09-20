@@ -62,6 +62,12 @@ function findVideo() {
  */
 const EPISODE_CODE = /^(?:S(\d+)\s*[:.]\s*)?[EO](\d+)$/i;
 
+/** A season standing on its own in a neighbouring element: "S6", "S6:", "Sezon 6", "6. sezon". */
+const SEASON_ONLY = [
+  /^S(?:ezon|eason)?\s*(\d+)\s*[:.]?$/i,
+  /^(\d+)\s*\.?\s*(?:sezon|season)\s*[:.]?$/i,
+];
+
 /**
  * Reads what is playing from the controls overlay, which renders the show name, the episode code
  * and the episode title as separate elements — as one string it reads "ShowO1Episode", so the
@@ -100,13 +106,20 @@ function findMedia() {
   const codeIndex = texts.findIndex((text) => EPISODE_CODE.test(text));
   if (codeIndex === -1) return { series: null, season: null, episode: null, title: texts[0] };
 
-  const [, season, episode] = texts[codeIndex].match(EPISODE_CODE);
+  const [, inlineSeason, episode] = texts[codeIndex].match(EPISODE_CODE);
+
+  // On some titles the code is split across elements: the episode reads "O3" on its own while the
+  // season sits in a neighbouring one. Missing this stored a season 6 episode as season 1, and
+  // the popup then filed it under the wrong season chip.
+  const neighbouringSeason = texts
+    .flatMap((text) => SEASON_ONLY.map((pattern) => text.match(pattern)?.[1]))
+    .find(Boolean);
 
   return {
     series: texts[0],
-    // Netflix leaves the season out for single-season shows; the popup groups episodes by season,
-    // so the implicit first one is spelled out rather than stored as null.
-    season: Number(season ?? 1),
+    // Netflix leaves the season out entirely for single-season shows; the popup groups episodes by
+    // season, so the implicit first one is spelled out rather than stored as null.
+    season: Number(inlineSeason ?? neighbouringSeason ?? 1),
     episode: Number(episode),
     title: texts[codeIndex + 1] ?? null,
   };
