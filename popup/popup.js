@@ -70,8 +70,25 @@ function createProgressBar(entry) {
   return bar;
 }
 
+/**
+ * "55 min left" / "1 h 02 min left". Needs a runtime, which only shows up once the platform's
+ * progress bar has been read at least once, so entries can exist without one.
+ */
+function timeLeft(entry) {
+  if (!entry.duration) return null;
+
+  const minutes = Math.round((entry.duration * (1 - (entry.progress ?? 0))) / 60);
+  if (minutes < 1) return "less than a minute left";
+
+  const hours = Math.floor(minutes / 60);
+  return hours
+    ? `${hours} h ${String(minutes % 60).padStart(2, "0")} min left`
+    : `${minutes} min left`;
+}
+
 function statusLine(entry) {
-  return entry.status === "watched" ? "Watched" : `${percent(entry)}% watched`;
+  if (entry.status === "watched") return "Watched";
+  return [`${percent(entry)}% watched`, timeLeft(entry)].filter(Boolean).join(" · ");
 }
 
 function createGroupNode(group) {

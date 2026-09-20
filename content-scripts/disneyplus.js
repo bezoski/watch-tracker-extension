@@ -200,11 +200,17 @@ async function capture(reason) {
   // group it under, which shows up in the popup as a second, nameless card for the same show.
   if (!media) return;
 
+  // Read before the entry is built: findProgress refreshes the anchor the runtime comes from.
+  const progress = findProgress(all, video);
+
   const saved = await saveEntry({
     id: `${PLATFORM}:${id}`,
     platform: PLATFORM,
     ...media,
-    progress: findProgress(all, video) ?? undefined,
+    progress: progress ?? undefined,
+    // The slider's aria-valuemax is the full runtime in seconds — nothing else on the page states
+    // it, since the video element's own duration is Infinity.
+    duration: anchor?.max ?? undefined,
   });
 
   log(reason, saved);
