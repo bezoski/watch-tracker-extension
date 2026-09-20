@@ -108,18 +108,19 @@ function findMedia() {
 
   const [, inlineSeason, episode] = texts[codeIndex].match(EPISODE_CODE);
 
-  // On some titles the code is split across elements: the episode reads "O3" on its own while the
-  // season sits in a neighbouring one. Missing this stored a season 6 episode as season 1, and
-  // the popup then filed it under the wrong season chip.
+  // Kept for the shapes where a season does appear — a neighbouring element, or "S6:O3" inline.
   const neighbouringSeason = texts
     .flatMap((text) => SEASON_ONLY.map((pattern) => text.match(pattern)?.[1]))
     .find(Boolean);
 
+  const season = inlineSeason ?? neighbouringSeason;
+
   return {
     series: texts[0],
-    // Netflix leaves the season out entirely for single-season shows; the popup groups episodes by
-    // season, so the implicit first one is spelled out rather than stored as null.
-    season: Number(inlineSeason ?? neighbouringSeason ?? 1),
+    // The player states the episode number but not the season — that is only shown on the title's
+    // own page, which is gone by the time playback starts. Defaulting to 1 would not be a
+    // fallback but an invention: it filed a season 6 episode under season 1. Unknown stays null.
+    season: season ? Number(season) : null,
     episode: Number(episode),
     title: texts[codeIndex + 1] ?? null,
   };

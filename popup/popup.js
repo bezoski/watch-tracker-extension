@@ -49,8 +49,11 @@ const platformLabel = (entry) => PLATFORM_LABELS[entry.platform] ?? entry.platfo
 /** A missing series name is what makes something a movie — there is no type field to read. */
 const typeLabel = (entry) => (entry.series ? "Series" : "Movie");
 const percent = (entry) => Math.round((entry.progress ?? 0) * 100);
-const episodeCode = (entry) =>
-  entry.season && entry.episode ? `S${entry.season}:E${entry.episode}` : null;
+/** Netflix states the episode but not the season, so the code has to read without one. */
+const episodeCode = (entry) => {
+  if (!entry.episode) return null;
+  return entry.season ? `S${entry.season}:E${entry.episode}` : `E${entry.episode}`;
+};
 
 /**
  * Groups episodes of the same series on the same platform. Movies have no series name, so each

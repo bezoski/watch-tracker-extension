@@ -72,9 +72,18 @@ The episode code among those children is the signal, so the verdict is immediate
 like on Disney+, where absence had to be inferred over several probes. A movie's title overlay has
 the name only.
 
-Format is locale dependent and the season is **omitted entirely for single-season shows**: this
-capture shows `O1` (O = odcinek in Polish), a multi-season title shows `S2:O3`, and English locale
-uses `E`. Hence `/^(?:S(\d+)\s*[:.]\s*)?[EO](\d+)$/i` — and a missing season is stored as 1.
+Format is locale dependent: this capture shows `O1` (O = odcinek in Polish), English locale uses
+`E`. Hence `/^(?:S(\d+)\s*[:.]\s*)?[EO](\d+)$/i`.
+
+**The player never states the season.** Not for single-season titles and not for multi-season ones
+either — a season 6 episode renders as plain `O3`. The season is shown only on the title's own
+page, which is gone by the time playback starts. Storing 1 when it is missing is therefore not a
+fallback but an invention, and it filed season 6 episodes under season 1; unknown is stored as
+`null` instead, and the popup renders `E3` rather than `S1:E3`.
+
+The season-from-a-neighbouring-element patterns are kept for the shapes where one does show up
+(`S6`, `S6:`, `Sezon 6`, `6. sezon`, or `S6:O3` inline), since no Netflix locale has been ruled
+out — but on this account nothing in the player carries it.
 
 ## Watched detection
 
