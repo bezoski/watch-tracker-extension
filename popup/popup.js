@@ -15,8 +15,16 @@ const PLATFORM_LABELS = {
   netflix: "Netflix",
 };
 
+const TYPE_FILTERS = [
+  { label: "All", value: "all" },
+  { label: "Movies", value: "movie" },
+  { label: "Series", value: "series" },
+];
+
 const browseHeader = document.getElementById("browse-header");
 const searchInput = document.getElementById("search");
+const typeFilters = document.getElementById("type-filters");
+const platformFilters = document.getElementById("platform-filters");
 const list = document.getElementById("list");
 const emptyMessage = document.getElementById("empty");
 
@@ -33,7 +41,13 @@ let openSeriesKey = null;
 /** Season shown in the detail view; null means all of them. */
 let selectedSeason = null;
 
+/** Browse-list filters: one of TYPE_FILTERS, and a platform key or null for every platform. */
+let typeFilter = "all";
+let platformFilter = null;
+
 const platformLabel = (entry) => PLATFORM_LABELS[entry.platform] ?? entry.platform;
+/** A missing series name is what makes something a movie — there is no type field to read. */
+const typeLabel = (entry) => (entry.series ? "Series" : "Movie");
 const percent = (entry) => Math.round((entry.progress ?? 0) * 100);
 const episodeCode = (entry) =>
   entry.season && entry.episode ? `S${entry.season}:E${entry.episode}` : null;
@@ -58,6 +72,20 @@ function groupEntries(entries) {
   }
 
   return [...groups.values()];
+}
+
+function createTags(entry) {
+  const row = document.createElement("div");
+  row.className = "tags";
+
+  for (const label of [typeLabel(entry), platformLabel(entry)]) {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = label;
+    row.append(tag);
+  }
+
+  return row;
 }
 
 function createProgressBar(entry) {
@@ -102,22 +130,23 @@ function createGroupNode(group) {
   title.className = "entry__title";
   title.textContent = (isSeries ? latest.series : latest.title) ?? "Untitled";
 
-  const meta = document.createElement("p");
-  meta.className = "entry__meta";
-  meta.textContent = [
-    isSeries ? [episodeCode(latest), latest.title].filter(Boolean).join(" · ") : null,
-    platformLabel(latest),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   const status = document.createElement("p");
   status.className = "entry__status";
   status.textContent = isSeries
     ? `${statusLine(latest)} · ${episodes.length} episode${episodes.length > 1 ? "s" : ""} watched`
     : statusLine(latest);
 
-  item.append(title, meta, createProgressBar(latest), status);
+  item.append(title, createTags(latest));
+
+  // Movies have nothing left to say here: their name is the heading and the rest is in the tags.
+  if (isSeries) {
+    const meta = document.createElement("p");
+    meta.className = "entry__meta";
+    meta.textContent = [episodeCode(latest), latest.title].filter(Boolean).join(" · ");
+    item.append(meta);
+  }
+
+  item.append(createProgressBar(latest), status);
 
   if (isSeries) {
     item.classList.add("entry--clickable");
@@ -165,6 +194,53 @@ function createEpisodeNode(entry) {
   return item;
 }
 
+function createChip(label, isActive, onSelect) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = isActive ? "chip chip--active" : "chip";
+  button.textContent = label;
+  button.addEventListener("click", onSelect);
+  return button;
+}
+
+function renderTypeFilters() {
+  typeFilters.replaceChildren(
+    ...TYPE_FILTERS.map(({ label, value }) =>
+      createChip(label, value === typeFilter, () => {
+        typeFilter = value;
+        render();
+      })
+    )
+  );
+}
+
+/**
+ * Platform chips are worth showing only once the history holds more than one platform — with a
+ * single one every chip would filter to the same list. They come from what is stored, so Netflix
+ * appears by itself the first time something is tracked there.
+ */
+function renderPlatformFilters(entries) {
+  const platforms = [...new Set(entries.map((entry) => entry.platform))].sort();
+
+  platformFilters.hidden = platforms.length < 2;
+
+  if (platforms.length < 2 || !platforms.includes(platformFilter)) platformFilter = null;
+  if (platforms.length < 2) return;
+
+  platformFilters.replaceChildren(
+    createChip("All", platformFilter === null, () => {
+      platformFilter = null;
+      render();
+    }),
+    ...platforms.map((platform) =>
+      createChip(PLATFORM_LABELS[platform] ?? platform, platform === platformFilter, () => {
+        platformFilter = platform;
+        render();
+      })
+    )
+  );
+}
+
 /**
  * Season chips are derived from the episodes actually stored, so a season shows up by itself
  * once anything from it has been watched — there is nothing to configure.
@@ -177,22 +253,27 @@ function renderSeasonFilters(episodes) {
   seasonFilters.hidden = seasons.length === 0;
   if (seasons.length === 0) return;
 
-  const chip = (label, season) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = season === selectedSeason ? "chip chip--active" : "chip";
-    button.textContent = label;
-    button.addEventListener("click", () => {
-      selectedSeason = season;
-      renderDetail();
-    });
-    return button;
-  };
-
   seasonFilters.replaceChildren(
-    chip("All", null),
-    ...seasons.map((season) => chip(`Season ${season}`, season))
+    createChip("All", selectedSeason === null, () => {
+      selectedSeason = null;
+      renderDetail();
+    }),
+    ...seasons.map((season) =>
+      createChip(`Season ${season}`, season === selectedSeason, () => {
+        selectedSeason = season;
+        renderDetail();
+      })
+    )
   );
+}
+
+function matchesFilters(group) {
+  const isSeries = Boolean(group.latest.series);
+
+  if (typeFilter === "movie" && isSeries) return false;
+  if (typeFilter === "series" && !isSeries) return false;
+
+  return platformFilter === null || group.latest.platform === platformFilter;
 }
 
 async function openSeries(group) {
@@ -225,13 +306,18 @@ async function renderDetail() {
   detail.hidden = false;
 
   detailTitle.textContent = group.latest.series;
-  detailMeta.textContent = `${platformLabel(group.latest)} · ${group.episodes.length} watched`;
+  detailMeta.textContent = [
+    typeLabel(group.latest),
+    platformLabel(group.latest),
+    `${group.episodes.length} watched`,
+  ].join(" · ");
 
-  renderSeasonFilters(group.episodes);
-
-  // The selected season may disappear when its last episode is deleted.
+  // The selected season may disappear when its last episode is deleted — checked before the chips
+  // are drawn, so none of them is left highlighted for a season that is no longer there.
   const seasonExists = group.episodes.some((entry) => entry.season === selectedSeason);
   if (selectedSeason !== null && !seasonExists) selectedSeason = null;
+
+  renderSeasonFilters(group.episodes);
 
   // Most recently watched first — the point of opening a series is "where did I stop".
   const episodes = group.episodes
@@ -242,11 +328,17 @@ async function renderDetail() {
 }
 
 async function render() {
-  const groups = groupEntries(await searchEntries(searchInput.value));
+  // Chips describe the whole history, not the current search, so they do not vanish while typing.
+  renderTypeFilters();
+  renderPlatformFilters(Object.values(await getEntries()));
+
+  const groups = groupEntries(await searchEntries(searchInput.value)).filter(matchesFilters);
 
   list.replaceChildren(...groups.map(createGroupNode));
   emptyMessage.hidden = groups.length > 0;
-  emptyMessage.textContent = searchInput.value.trim() ? "No matches." : "Nothing tracked yet.";
+
+  const narrowed = searchInput.value.trim() || typeFilter !== "all" || platformFilter !== null;
+  emptyMessage.textContent = narrowed ? "No matches." : "Nothing tracked yet.";
 }
 
 searchInput.addEventListener("input", render);

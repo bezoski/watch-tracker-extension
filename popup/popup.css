@@ -176,11 +176,11 @@ ul {
   font-size: 11px;
 }
 
-#seasons {
+.filters {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .chip {
@@ -201,6 +201,27 @@ ul {
 .chip--active {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* Type and platform, stated on every card so the list is readable without opening anything. */
+.tags {
+  display: flex;
+  gap: 4px;
+  margin: 5px 0 8px;
+}
+
+.tag {
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--surface-alt);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.entry--watched .tag {
+  color: var(--done);
 }
 
 #empty {
