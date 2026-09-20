@@ -13,8 +13,18 @@ const PLATFORM = "disneyplus";
 const SAVE_INTERVAL_MS = 5000;
 const DEBUG = true;
 
+/**
+ * Until it is known what is playing there is nothing in the popup at all, so that phase is probed
+ * every second and only the steady stream of progress updates runs on the slower save interval.
+ */
+const PROBE_INTERVAL_MS = 1000;
+
+/** Probes of playback without an episode code before the content is treated as a movie. */
+const MOVIE_VERDICT_PROBES = 4;
+
 let captureTimer = null;
 let currentId = null;
+let stopped = false;
 
 function log(...args) {
   if (DEBUG) console.log("WT:", ...args);
@@ -80,8 +90,11 @@ function findProgress(all, video) {
   return null;
 }
 
-/** Series name comes from the tab title; the player never shows it outside the controls. */
-function seriesName() {
+/**
+ * Holds the series name on episodes and the film name on movies; the player itself never shows
+ * either outside the controls overlay.
+ */
+function tabTitle() {
   return document.title.replace(/\s*\|\s*Disney\+\s*$/, "").trim() || null;
 }
 
@@ -105,14 +118,20 @@ function hostOf(el) {
 
 /**
  * Reads what is playing from the title bug, which shows "S2:O3 Rozdział 11: Spadkobierczyni"
- * for episodes and a plain name for movies. The season/episode letter is locale dependent
- * (O = odcinek in Polish, E in English), hence the loose character class.
+ * for episodes. The season/episode letter is locale dependent (O = odcinek in Polish, E in
+ * English), hence the loose character class.
  *
- * Returns null until the title bug is on screen — the caller then skips saving, so an entry is
- * never written without knowing whether it belongs to a series.
+ * Returns null while it is still unknown whether this is an episode or a movie — the caller then
+ * skips saving, so an entry is never written without knowing whether it belongs to a series.
  */
 function findMedia(all, id) {
-  if (mediaCache.id === id) return mediaCache.info;
+  const cached = mediaCache.id === id ? mediaCache.info : null;
+
+  // An episode code is proof of what is playing, so it is frozen. "This is a movie" is only ever
+  // inferred from the absence of one, so that verdict stays open: a title bug that renders late
+  // still gets to overrule it, and the stored entry is corrected on the next save because the id
+  // is per content, not per verdict.
+  if (cached?.season) return cached;
 
   // The title bug holds several lines — the show name and, for episodes, a separate line with
   // the episode code. Which line renders first is not guaranteed, so all of them are searched.
@@ -121,22 +140,26 @@ function findMedia(all, id) {
     .map((el) => el.textContent?.trim())
     .filter(Boolean);
 
-  if (!texts.length) return null;
-
   const match = texts.map((text) => text.match(/S(\d+)\s*[:.]\s*[EO](\d+)\s*(.*)/i)).find(Boolean);
 
-  // A movie's title bug never grows an episode line, but an episode's may lag a tick behind, so
-  // the "no episode code" verdict is only trusted after a few attempts.
-  if (!match && ++movieAttempts < 4) return null;
+  // A movie's title bug never grows an episode line, and on some films it renders nothing at all,
+  // so "this is a movie" is a verdict reached by waiting rather than by a signal in the DOM.
+  if (!match) {
+    if (cached) return cached;
+    if (++movieAttempts < MOVIE_VERDICT_PROBES) return null;
+    log("no episode code after", movieAttempts, "probes, treating as a movie. Title bug:", texts);
+  }
+
+  // A movie is named by the tab title, not by the title bug: its lines can be badges ("4K",
+  // "Dolby Vision") with the film's name nowhere among them.
+  const title = match ? match[3].replace(/^[\s:–-]+/, "").trim() || null : tabTitle();
+
+  // Without a name there is nothing worth storing — keep waiting instead of saving a blank card.
+  if (!title) return null;
 
   const info = match
-    ? {
-        series: seriesName(),
-        season: Number(match[1]),
-        episode: Number(match[2]),
-        title: match[3].replace(/^[\s:–-]+/, "").trim() || null,
-      }
-    : { series: null, season: null, episode: null, title: texts[0] };
+    ? { series: tabTitle(), season: Number(match[1]), episode: Number(match[2]), title }
+    : { series: null, season: null, episode: null, title };
 
   log("media identified", info);
   mediaCache = { id, info };
@@ -146,7 +169,8 @@ function findMedia(all, id) {
 async function capture(reason) {
   // Reloading or updating the extension orphans this script; chrome.* calls then throw.
   if (!chrome.runtime?.id) {
-    clearInterval(captureTimer);
+    stopped = true;
+    clearTimeout(captureTimer);
     log("extension context invalidated — stopping, reload the page");
     return;
   }
@@ -172,8 +196,8 @@ async function capture(reason) {
   const all = deepAll();
   const media = findMedia(all, id);
 
-  // Saving before the title bug appears would create an entry with no series to group it under,
-  // which shows up in the popup as a second, nameless card for the same show.
+  // Saving before it is known whether this is an episode would create an entry with no series to
+  // group it under, which shows up in the popup as a second, nameless card for the same show.
   if (!media) return;
 
   const saved = await saveEntry({
@@ -208,14 +232,44 @@ function watchForEnd() {
   return true;
 }
 
+/**
+ * The "up next" host is not in the DOM from the start: on episodes it mounts with the rest of the
+ * player, and a movie may never get one, so capturing must not wait for it. It is picked up
+ * whenever it shows up — including at the very end of a film, should Disney+ mount one there.
+ */
+function waitForEndOverlay() {
+  if (watchForEnd()) return;
+
+  const observer = new MutationObserver(() => {
+    if (watchForEnd()) observer.disconnect();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 /** The player mounts long after document_idle, so wait for it rather than assuming it exists. */
 function waitForPlayer() {
-  if (findVideo() && watchForEnd()) {
-    capture("initial capture");
-    captureTimer = setInterval(() => capture("tick"), SAVE_INTERVAL_MS);
+  if (!findVideo()) {
+    setTimeout(waitForPlayer, 1000);
     return;
   }
-  setTimeout(waitForPlayer, 1000);
+
+  capture("initial capture");
+  scheduleCapture();
+  waitForEndOverlay();
+}
+
+/** A self-rescheduling timer rather than an interval, because the delay changes once identified. */
+function scheduleCapture() {
+  if (stopped) return;
+
+  // The cache is matched against the id being played, so switching episodes in the SPA drops back
+  // to the fast cadence instead of coasting on the previous episode's identification.
+  const identified = mediaCache.id === currentId && mediaCache.info;
+
+  captureTimer = setTimeout(async () => {
+    await capture("tick");
+    scheduleCapture();
+  }, identified ? SAVE_INTERVAL_MS : PROBE_INTERVAL_MS);
 }
 
 log("Disney+ content script loaded");
