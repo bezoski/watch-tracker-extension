@@ -7,6 +7,12 @@
   --muted: #9aa3b2;
   --accent: #4a9eff;
   --done: #3ddc84;
+
+  /* Brand colours: Netflix is red on black, Disney+ is blue on white. */
+  --netflix-bg: #000000;
+  --netflix-fg: #e50914;
+  --disneyplus-bg: #ffffff;
+  --disneyplus-fg: #113ccf;
 }
 
 * {
@@ -212,6 +218,44 @@ ul {
   color: var(--accent);
 }
 
+/*
+ * Platform chips carry the brand colours in every state; the one selected is told apart by full
+ * opacity and a border in the brand colour. The doubled class outranks the plain chip's hover and
+ * active colours, which would otherwise repaint the text.
+ */
+.chip.chip--netflix,
+.chip.chip--netflix:hover {
+  background: var(--netflix-bg);
+  color: var(--netflix-fg);
+}
+
+.chip.chip--disneyplus,
+.chip.chip--disneyplus:hover {
+  background: var(--disneyplus-bg);
+  color: var(--disneyplus-fg);
+}
+
+.chip--netflix,
+.chip--disneyplus {
+  font-weight: 600;
+  opacity: 0.55;
+}
+
+.chip--netflix:hover,
+.chip--disneyplus:hover,
+.chip--netflix.chip--active,
+.chip--disneyplus.chip--active {
+  opacity: 1;
+}
+
+.chip.chip--netflix.chip--active {
+  border-color: var(--netflix-fg);
+}
+
+.chip.chip--disneyplus.chip--active {
+  border-color: var(--disneyplus-fg);
+}
+
 /* Type and platform, stated on every card so the list is readable without opening anything. */
 .tags {
   display: flex;
@@ -229,8 +273,23 @@ ul {
   text-transform: uppercase;
 }
 
-.entry--watched .tag {
+/* Only the type tag turns green: the platform tag keeps its brand colours whatever the status. */
+.entry--watched .tag--type {
   color: var(--done);
+}
+
+.tag--netflix {
+  background: var(--netflix-bg);
+  color: var(--netflix-fg);
+}
+
+.tag--disneyplus {
+  background: var(--disneyplus-bg);
+  color: var(--disneyplus-fg);
+}
+
+.tag--platform {
+  font-weight: 700;
 }
 
 #empty {

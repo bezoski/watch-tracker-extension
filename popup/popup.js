@@ -82,17 +82,21 @@ function groupEntries(entries) {
   return [...groups.values()];
 }
 
+function createTag(label, className) {
+  const tag = document.createElement("span");
+  tag.className = `tag ${className}`;
+  tag.textContent = label;
+  return tag;
+}
+
+/** The platform tag wears the platform's own colours, so it reads at a glance without the text. */
 function createTags(entry) {
   const row = document.createElement("div");
   row.className = "tags";
-
-  for (const label of [typeLabel(entry), platformLabel(entry)]) {
-    const tag = document.createElement("span");
-    tag.className = "tag";
-    tag.textContent = label;
-    row.append(tag);
-  }
-
+  row.append(
+    createTag(typeLabel(entry), "tag--type"),
+    createTag(platformLabel(entry), `tag--platform tag--${entry.platform}`)
+  );
   return row;
 }
 
@@ -226,10 +230,13 @@ function createEpisodeNode(entry) {
   return item;
 }
 
-function createChip(label, isActive, onSelect) {
+/** `modifier` names a variant class, such as a platform key for the brand-coloured chips. */
+function createChip(label, isActive, onSelect, modifier) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = isActive ? "chip chip--active" : "chip";
+  button.className = ["chip", modifier && `chip--${modifier}`, isActive && "chip--active"]
+    .filter(Boolean)
+    .join(" ");
   button.textContent = label;
   button.addEventListener("click", onSelect);
   return button;
@@ -265,10 +272,15 @@ function renderPlatformFilters(entries) {
       render();
     }),
     ...platforms.map((platform) =>
-      createChip(PLATFORM_LABELS[platform] ?? platform, platform === platformFilter, () => {
-        platformFilter = platform;
-        render();
-      })
+      createChip(
+        PLATFORM_LABELS[platform] ?? platform,
+        platform === platformFilter,
+        () => {
+          platformFilter = platform;
+          render();
+        },
+        platform
+      )
     )
   );
 }
