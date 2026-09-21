@@ -20,7 +20,6 @@ Wtyczka lokalnie śledzi co oglądasz na wspieranych platformach, zapisuje trwal
 | Platforma              | Hardcode per content script (Netflix, Disney+)                                                                             |
 | % obejrzane (film)     | `video.currentTime / video.duration`                                                                                       |
 | Sezon/odcinek (serial) | Parsowanie `document.title` (jeśli platforma to udostępnia) → fallback: pasek tytułu w odtwarzaczu                         |
-| Okładka                | Selektor na `<img>` / `background-image`                                                                                   |
 | Detekcja "obejrzane"   | `MutationObserver` czekający na natywną nakładkę platformy ("Następny odcinek" / ekran napisów końcowych) — nie liczenie % |
 | Trwałość historii      | `chrome.storage.local` — niezależna od tego co robi platforma ze swoją historią                                            |
 
@@ -90,7 +89,7 @@ Commituj na bieżąco po każdym etapie — historia commitów jest częścią p
 ### 2. Rekonesans selektorów (przed kodem!)
 
 - Otwórz Netflix, DevTools → Elements
-- Namierz: selektor tytułu, selektor okładki, sposób pokazania sezonu/odcinka, element nakładki "Następny odcinek"
+- Namierz: selektor tytułu, sposób pokazania sezonu/odcinka, element nakładki "Następny odcinek"
 - Powtórz dla Disney+
 - Zapisz selektory w notatce — to podstawa pod content scripts
 
@@ -102,7 +101,7 @@ Commituj na bieżąco po każdym etapie — historia commitów jest częścią p
 
 ### 4. `storage.js` — wspólna logika
 
-- Funkcje: zapisz wpis (tytuł, platforma, sezon/odcinek, okładka, status: w trakcie/obejrzane, % postępu)
+- Funkcje: zapisz wpis (tytuł, platforma, sezon/odcinek, status: w trakcie/obejrzane, % postępu)
 - Funkcja: pobierz historię, funkcja: wyszukaj po tytule
 
 ### 5. Content script: Netflix
@@ -118,7 +117,7 @@ Commituj na bieżąco po każdym etapie — historia commitów jest częścią p
 
 ### 7. Popup
 
-- Lista zapisanych pozycji: tytuł, okładka, platforma, status/postęp
+- Lista zapisanych pozycji: tytuł, platforma, status/postęp
 - Wyszukiwarka po tytule
 - Test: "Load unpacked" w `chrome://extensions`
 

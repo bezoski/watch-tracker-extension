@@ -11,7 +11,6 @@
  *   series     series name, null for movies
  *   season     number, null for movies
  *   episode    number, null for movies
- *   poster     image URL, null when not found
  *   progress   0–1
  *   duration   runtime in seconds, missing until the platform reveals it
  *   status     "in-progress" | "watched"

@@ -42,7 +42,6 @@ as `document.querySelector(tag).shadowRoot`, but its *contents* need a recursive
 | --- | --- |
 | Title / season / episode | `title-bug` — `title-overlay` is always empty. Match on this host specifically: `pivot-tray-tile` and `up-next-lite-v1` render the same `S<n>:<E\|O><n>` shape for *other* episodes |
 | Episode finished | `up-next-lite-v1` |
-| Cover art | `poster-overlay` — empty in every capture, so entries are saved without a poster |
 
 Other hosts present: `disney-web-player-ui`, `main-app-controls-overlay`, `skip-overlay`,
 `preplay-overlay`, `buffering-overlay`, `inactivity-overlay`.
