@@ -26,9 +26,17 @@ const SELECTOR_PANEL = '[data-uia="selector-episode"]';
 const SEASON_HEADER = '[data-uia="selector-episode-header"]';
 const NOW_PLAYING = '[data-uia="episode-pane-item-now-playing"]';
 
-/** Either button means the episode reached its credits. */
-const END_SIGNALS =
-  '[data-uia="next-episode-seamless-button"], [data-uia="watch-credits-seamless-button"]';
+/**
+ * Episodes end on either seamless button once the credits start. Movies get neither: the player
+ * shrinks into a postplay screen instead, which is why movies were never marked watched until the
+ * end screen was recorded (docs/selectors-netflix.md).
+ */
+const END_SIGNALS = [
+  '[data-uia="next-episode-seamless-button"]',
+  '[data-uia="watch-credits-seamless-button"]',
+  '[data-uia="postplay-player-space"]',
+  '[data-uia="postplay-back-to-browse"]',
+].join(", ");
 
 let captureTimer = null;
 let currentId = null;
@@ -315,16 +323,16 @@ async function markWatchedOnce(reason) {
 }
 
 /**
- * The end-of-episode buttons replace the controls rather than living in them, so they are caught
- * on the body. The observer is kept running: Netflix rolls straight into the next episode, which
- * has to be marked in turn.
+ * The end screens replace the controls rather than living in them, so they are caught on the
+ * body. The observer is kept running: Netflix rolls straight into the next episode, which has to
+ * be marked in turn.
  */
 function watchForEnd() {
   new MutationObserver(() => {
-    if (document.querySelector(END_SIGNALS)) markWatchedOnce("end-of-episode controls detected");
+    if (document.querySelector(END_SIGNALS)) markWatchedOnce("end screen detected");
   }).observe(document.body, { childList: true, subtree: true });
 
-  log("watching for end-of-episode controls");
+  log("watching for the end screen");
 }
 
 /** The player mounts long after document_idle, so wait for it rather than assuming it exists. */
@@ -335,8 +343,8 @@ function waitForPlayer() {
     return;
   }
 
-  // Movies may get no seamless button at all — what their end screen looks like is still an open
-  // question (docs/selectors-netflix.md), so the element reaching its end serves as a fallback.
+  // Never seen firing — a movie keeps playing through its credits while the postplay screen is
+  // up — but it costs nothing and covers a title with no end screen at all.
   video.addEventListener("ended", () => markWatchedOnce("video ended"));
 
   capture("initial capture");

@@ -120,8 +120,20 @@ watch-credits-seamless-button
 A `MutationObserver` on `document.body` waiting for either is the signal. `video-title` and
 `controls-standard` are gone by then, which is why metadata must be captured earlier.
 
-Unverified: what a **movie** shows at its end — no movie capture was taken. A `video.ended`
-listener is wired up as a fallback, but the real end screen still needs a recon pass.
+Movies get **neither** button. Recorded on "Władca Pierścieni: Drużyna Pierścienia" (extended,
+`duration` 10702 s): at 10378 s — 97 %, where the credits start — the player shrinks into a
+postplay screen, and these appear together:
+
+```
+postplay-player-space        postplay-back-to-browse
+postplay-rating-container    postplay-thumbs-container   thumbs-rate-button
+countdown-timer              background-video            season-renewal-*
+```
+
+`postplay-player-space` and `postplay-back-to-browse` are the ones used: the rest are either a
+promo for another title (`season-renewal-*`) or a rating prompt that may be skipped for something
+already rated. `video.ended` never fired — the film keeps playing through the credits behind the
+postplay screen — so it stays only as a no-cost fallback.
 
 ## Full `data-uia` inventory
 
