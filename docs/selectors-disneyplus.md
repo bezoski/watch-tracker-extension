@@ -65,6 +65,24 @@ never its text, and skip its subtree when scanning for the current episode numbe
 Known trade-off: seeking to the end of an episode triggers the same overlay, so it counts as
 watched. Telling that apart from real playback is not possible from the DOM alone.
 
+### Movies
+
+A movie never fills `up-next-lite-v1` — the host is mounted, but there is nothing to offer next.
+Recorded on "Gwiezdne wojny: Mroczne widmo" (runtime 8172 s):
+
+- the credits start around 97 %, and nothing appears there — unlike Netflix, which shows its end
+  screen at the start of the credits
+- at the very end (99.95 %) `restart-playback` fills in: the "watch again" overlay
+- the URL stays on `/play/<id>`, so there is no navigation to catch
+
+`restart-playback` is the movie signal, with one guard: its name also fits a "start over" prompt on
+resuming a film. It did not appear when a film was resumed at 97 %, but since a wrong "watched" can
+never be undone, it is only believed at 90 % progress or more — or when progress is unknown, which
+just means the slider was never on screen.
+
+Also recorded, and not end signals: `ratings-overlay` (the age rating plate at the start of
+playback) and `progress-bar-preview` (thumbnail preview while scrubbing).
+
 ## Title source
 
 `document.title` is `"The Mandalorian | Disney+"` — series name only, no season/episode.

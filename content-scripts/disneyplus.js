@@ -26,6 +26,9 @@ let captureTimer = null;
 let currentId = null;
 let stopped = false;
 
+/** Id already flagged as watched, so an overlay sitting on screen is not re-saved every mutation. */
+let markedId = null;
+
 function log(...args) {
   if (DEBUG) console.log("WT:", ...args);
 }
@@ -217,39 +220,73 @@ async function capture(reason) {
 }
 
 /**
- * The "up next" overlay renders an empty comment node during playback and fills in once the
- * episode ends. Its own text names the *next* episode, so only its appearance is used.
+ * Overlays that render empty during playback and fill in once it ends. An episode ends on "up
+ * next", whose text names the *next* episode, so only its appearance is used. A movie has nothing
+ * to follow it and ends on "restart playback" instead (docs/selectors-disneyplus.md).
  */
-function watchForEnd() {
-  const host = document.querySelector("up-next-lite-v1");
+const END_OVERLAYS = [
+  {
+    host: "up-next-lite-v1",
+    isShowing: (root) => Boolean(root.querySelector(".up-next-lite-v1-overlay")),
+  },
+  {
+    host: "restart-playback",
+    isShowing: (root) => Boolean(root.querySelector("*")),
+    // Named like a "start over" prompt, so it is only believed near the end of the film. It was
+    // not seen on resuming a movie, but that is one observation, and a wrong "watched" is
+    // permanent: storage refuses to ever downgrade it.
+    minProgress: 0.9,
+  },
+];
+
+async function markWatchedOnce(reason, minProgress) {
+  const id = contentId();
+  if (!id || id === markedId) return;
+
+  if (minProgress) {
+    const video = findVideo();
+    const progress = video ? findProgress(deepAll(), video) : null;
+
+    // Unknown progress is let through: it only means the slider was never on screen, and blocking
+    // on it would leave a film watched start to finish without touching the mouse unmarked.
+    if (progress !== null && progress < minProgress) {
+      log(reason, "showed at", Math.round(progress * 100) + "% — too early to be the end, ignored");
+      return;
+    }
+  }
+
+  markedId = id;
+  log(reason, "detected → marking watched");
+
+  await capture("final capture");
+  await markWatched(`${PLATFORM}:${id}`);
+}
+
+function watchForEnd({ host: tag, isShowing, minProgress }) {
+  const host = document.querySelector(tag);
   if (!host?.shadowRoot) return false;
 
-  new MutationObserver(async () => {
-    if (!host.shadowRoot.querySelector(".up-next-lite-v1-overlay")) return;
-    const id = contentId();
-    if (!id) return;
-
-    log("up-next detected → marking watched");
-    await capture("final capture");
-    await markWatched(`${PLATFORM}:${id}`);
+  new MutationObserver(() => {
+    if (isShowing(host.shadowRoot)) markWatchedOnce(tag, minProgress);
   }).observe(host.shadowRoot, { childList: true, subtree: true });
 
-  log("watching up-next-lite-v1 for end of episode");
+  log("watching", tag, "for the end of playback");
   return true;
 }
 
 /**
- * The "up next" host is not in the DOM from the start: on episodes it mounts with the rest of the
- * player, and a movie may never get one, so capturing must not wait for it. It is picked up
- * whenever it shows up — including at the very end of a film, should Disney+ mount one there.
+ * The overlay hosts are not in the DOM from the start — they mount with the rest of the player —
+ * so capturing must not wait for them. Each is picked up whenever it shows up.
  */
-function waitForEndOverlay() {
-  if (watchForEnd()) return;
+function waitForEndOverlays() {
+  for (const overlay of END_OVERLAYS) {
+    if (watchForEnd(overlay)) continue;
 
-  const observer = new MutationObserver(() => {
-    if (watchForEnd()) observer.disconnect();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+    const observer = new MutationObserver(() => {
+      if (watchForEnd(overlay)) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
 }
 
 /** The player mounts long after document_idle, so wait for it rather than assuming it exists. */
@@ -261,7 +298,7 @@ function waitForPlayer() {
 
   capture("initial capture");
   scheduleCapture();
-  waitForEndOverlay();
+  waitForEndOverlays();
 }
 
 /** A self-rescheduling timer rather than an interval, because the delay changes once identified. */
