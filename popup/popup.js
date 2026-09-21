@@ -165,25 +165,49 @@ function createGroupNode(group) {
       if (event.key === "Enter" || event.key === " ") open();
     });
   } else {
-    item.append(createDeleteButton(latest.id));
+    item.append(createActions(latest));
   }
 
   return item;
 }
 
-function createDeleteButton(id) {
-  const remove = document.createElement("button");
-  remove.className = "delete";
-  remove.type = "button";
-  remove.textContent = "×";
-  remove.title = "Remove from history";
-  remove.addEventListener("click", async (event) => {
+/** Redraws whichever view is open, after an entry was changed from inside it. */
+const rerender = () => (openSeriesKey ? renderDetail() : render());
+
+function createActionButton(label, title, modifier, action) {
+  const button = document.createElement("button");
+  button.className = `action action--${modifier}`;
+  button.type = "button";
+  button.textContent = label;
+  button.title = title;
+  button.addEventListener("click", async (event) => {
     // Without this the click would also open the series card underneath.
     event.stopPropagation();
-    await deleteEntry(id);
-    openSeriesKey ? await renderDetail() : await render();
+    await action();
+    await rerender();
   });
-  return remove;
+  return button;
+}
+
+/**
+ * Every automatic "watched" signal has a gap somewhere — a tab closed during the credits, an end
+ * screen no recon has seen — so the popup has the final say. Only offered while unwatched: there
+ * is deliberately no way back, matching storage, which never downgrades a watched entry either.
+ */
+function createActions(entry) {
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  if (entry.status !== "watched") {
+    actions.append(
+      createActionButton("✓", "Mark as watched", "watched", () => markWatched(entry.id))
+    );
+  }
+
+  actions.append(
+    createActionButton("×", "Remove from history", "delete", () => deleteEntry(entry.id))
+  );
+  return actions;
 }
 
 function createEpisodeNode(entry) {
@@ -198,7 +222,7 @@ function createEpisodeNode(entry) {
   status.className = "episode__status";
   status.textContent = statusLine(entry);
 
-  item.append(title, createProgressBar(entry), status, createDeleteButton(entry.id));
+  item.append(title, createProgressBar(entry), status, createActions(entry));
   return item;
 }
 

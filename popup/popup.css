@@ -82,7 +82,7 @@ ul {
 
 .entry__title {
   margin: 0;
-  padding-right: 20px;
+  padding-right: 48px;
   font-size: 13px;
   font-weight: 600;
 }
@@ -95,7 +95,7 @@ ul {
 }
 
 .episode__title {
-  padding-right: 20px;
+  padding-right: 48px;
   color: var(--text);
   font-size: 12px;
 }
@@ -130,10 +130,22 @@ ul {
 }
 
 /* Only revealed on hover so the list stays calm when just browsing. */
-.delete {
+.actions {
   position: absolute;
   top: 6px;
   right: 6px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.entry:hover .actions,
+.episode:hover .actions,
+.actions:focus-within {
+  opacity: 1;
+}
+
+.action {
   padding: 2px 6px;
   border: none;
   border-radius: 4px;
@@ -141,16 +153,13 @@ ul {
   color: var(--muted);
   font-size: 14px;
   cursor: pointer;
-  opacity: 0;
 }
 
-.entry:hover .delete,
-.episode:hover .delete,
-.delete:focus {
-  opacity: 1;
+.action--watched:hover {
+  color: var(--done);
 }
 
-.delete:hover {
+.action--delete:hover {
   color: #ff6b6b;
 }
 
