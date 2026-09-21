@@ -80,6 +80,13 @@ resuming a film. It did not appear when a film was resumed at 97 %, but since a 
 never be undone, it is only believed at 90 % progress or more — or when progress is unknown, which
 just means the slider was never on screen.
 
+There is a second way a film ends, and it shows neither overlay: when autoplay is on, Disney+
+goes straight to the next title (Mroczne widmo → Zemsta Sithów) and only the `/play/<id>` in the
+URL changes — `restart-playback` is never even mounted. So leaving a title counts as finishing it
+when its stored progress is 98 % or more. That threshold is stricter than the overlay guard,
+because moving on is a weaker signal than an end screen: it has to separate autoplay at the end of
+the file from someone abandoning a film in its closing minutes.
+
 Also recorded, and not end signals: `ratings-overlay` (the age rating plate at the start of
 playback) and `progress-bar-preview` (thumbnail preview while scrubbing).
 

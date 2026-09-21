@@ -48,7 +48,12 @@ let platformFilter = null;
 const platformLabel = (entry) => PLATFORM_LABELS[entry.platform] ?? entry.platform;
 /** A missing series name is what makes something a movie — there is no type field to read. */
 const typeLabel = (entry) => (entry.series ? "Series" : "Movie");
-const percent = (entry) => Math.round((entry.progress ?? 0) * 100);
+/**
+ * Rounded down: rounding up turned 99.96 % into "100% watched" on an entry that was not watched,
+ * which contradicts the status next to it. Only "watched" is allowed to mean the end.
+ */
+const percent = (entry) =>
+  entry.status === "watched" ? 100 : Math.floor((entry.progress ?? 0) * 100);
 /** Netflix states the episode but not the season, so the code has to read without one. */
 const episodeCode = (entry) => {
   if (!entry.episode) return null;

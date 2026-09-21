@@ -22,6 +22,13 @@ const PROBE_INTERVAL_MS = 1000;
 /** Probes of playback without an episode code before the content is treated as a movie. */
 const MOVIE_VERDICT_PROBES = 4;
 
+/**
+ * Progress from which leaving a title counts as having finished it. Stricter than the overlay
+ * guard, because moving on is a weaker signal than an end screen: this has to tell autoplay at
+ * the end of the file apart from someone abandoning a film in its closing minutes.
+ */
+const LEFT_AT_END = 0.98;
+
 let captureTimer = null;
 let currentId = null;
 let stopped = false;
@@ -184,10 +191,13 @@ async function capture(reason) {
   // Disney+ is an SPA: switching episodes changes the URL without reloading this script, so the
   // previous episode's progress anchor has to be dropped or it would be applied to the new one.
   if (id !== currentId) {
+    const previousId = currentId;
     currentId = id;
     anchor = null;
     movieAttempts = 0;
     log("now playing", id);
+
+    await markFinishedOnLeave(previousId);
   }
 
   const video = findVideo();
@@ -260,6 +270,22 @@ async function markWatchedOnce(reason, minProgress) {
 
   await capture("final capture");
   await markWatched(`${PLATFORM}:${id}`);
+}
+
+/**
+ * When a film ends and Disney+ autoplays the next one, neither end overlay fills in — the URL just
+ * changes. Leaving a title from its very end is therefore an end signal of its own. It reads the
+ * stored entry rather than the live slider, because by now the player shows the next title.
+ */
+async function markFinishedOnLeave(previousId) {
+  if (!previousId || previousId === markedId) return;
+
+  const entry = (await getEntries())[`${PLATFORM}:${previousId}`];
+  if (!entry || entry.status === "watched" || (entry.progress ?? 0) < LEFT_AT_END) return;
+
+  markedId = previousId;
+  log("left", entry.title, "at", Math.round(entry.progress * 100) + "% → marking watched");
+  await markWatched(entry.id);
 }
 
 function watchForEnd({ host: tag, isShowing, minProgress }) {
