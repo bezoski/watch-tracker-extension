@@ -12,7 +12,8 @@
 
 const PLATFORM = "netflix";
 const SAVE_INTERVAL_MS = 5000;
-const DEBUG = true;
+/** Off for release. Flip it on when debugging, then filter the console by "WT:". */
+const DEBUG = false;
 
 /** While it is still unknown what is playing there is nothing in the popup at all. */
 const PROBE_INTERVAL_MS = 1000;

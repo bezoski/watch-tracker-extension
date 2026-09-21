@@ -11,7 +11,8 @@
 
 const PLATFORM = "disneyplus";
 const SAVE_INTERVAL_MS = 5000;
-const DEBUG = true;
+/** Off for release. Flip it on when debugging, then filter the console by "WT:". */
+const DEBUG = false;
 
 /**
  * Until it is known what is playing there is nothing in the popup at all, so that phase is probed
