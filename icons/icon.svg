@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Source for the PNG icons; colours are the popup's own tokens (--bg, --text, --accent). -->
+  <defs>
+    <clipPath id="arm">
+      <rect x="16" y="30" width="96" height="20" rx="5"/>
+    </clipPath>
+  </defs>
+
+  <rect width="128" height="128" rx="28" fill="#11151c"/>
+
+  <!-- Clapper arm, raised: tilted up around its left hinge. -->
+  <g transform="rotate(-15 18 50)">
+    <g clip-path="url(#arm)">
+      <rect x="16" y="30" width="96" height="20" fill="#e8eaed"/>
+      <path fill="#4a9eff"
+            d="M30 30h14l-12 20H18z M58 30h14l-12 20H46z M86 30h14l-12 20H74z M114 30h14l-12 20h-14z"/>
+    </g>
+  </g>
+
+  <!-- Board, with the check mark that makes it a watch tracker rather than a video player. -->
+  <rect x="16" y="56" width="96" height="54" rx="7" fill="#4a9eff"/>
+  <path d="M42 83l13 13 30-29" fill="none" stroke="#ffffff" stroke-width="12"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
